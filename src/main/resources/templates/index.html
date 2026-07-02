@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Notes Summarizer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            transition: background 0.3s, color 0.3s;
+        }
+        body.dark { background: #121417; color: #e6e6e6; }
+        .container {
+            background: #ffffff;
+            max-width: 700px;
+            width: 100%;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: background 0.3s;
+        }
+        body.dark .container { background: #1c1f24; }
+        header { text-align: center; margin-bottom: 10px; position: relative; }
+        header h1 { font-size: 28px; color: #2b2d42; }
+        body.dark header h1 { color: #f1f1f1; }
+        header p { color: #6c757d; margin-top: 8px; font-size: 15px; }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .history-link a { color: #4361ee; font-size: 14px; text-decoration: none; font-weight: 600; }
+        .dark-toggle {
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+        }
+        body.dark .dark-toggle { border-color: #555; color: #eee; }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            resize: vertical;
+            font-family: inherit;
+            background: white;
+            color: #1a1a1a;
+        }
+        body.dark textarea { background: #2a2e35; color: #eee; border-color: #444; }
+        textarea:focus { outline: none; border-color: #4361ee; }
+        .char-count { text-align: right; font-size: 12px; color: #999; margin-top: 6px; }
+
+        .length-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .length-options label {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        body.dark .length-options label { border-color: #444; color: #ccc; }
+        .length-options input { display: none; }
+        .length-options input:checked + label {
+            background: #4361ee;
+            color: white;
+            border-color: #4361ee;
+        }
+
+        button.submit-btn {
+            display: block;
+            width: 100%;
+            margin-top: 16px;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #4361ee;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button.submit-btn:hover { background: #3651d4; }
+        button.submit-btn:disabled { background: #a0aede; cursor: not-allowed; }
+
+        .summary-box {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fc;
+            border-left: 4px solid #4361ee;
+            border-radius: 6px;
+        }
+        body.dark .summary-box { background: #23262c; }
+        .summary-box h3 { margin-bottom: 10px; color: #2b2d42; font-size: 17px; }
+        body.dark .summary-box h3 { color: #f1f1f1; }
+        .summary-box p { line-height: 1.6; color: #333; }
+        body.dark .summary-box p { color: #ddd; }
+
+        .action-buttons { display: flex; gap: 10px; margin-top: 14px; }
+        .action-buttons button {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 13px;
+            background: #e9ecf5;
+            color: #4361ee;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        body.dark .action-buttons button { background: #2d3340; color: #a8b6ff; }
+        .action-buttons button:hover { opacity: 0.85; }
+
+        footer { text-align: center; margin-top: 30px; font-size: 13px; color: #999; }
+        .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #2b2d42;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 999;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    animation: blinkOnce 0.4s ease;
+}
+@keyframes blinkOnce {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    75% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="top-bar">
+        <div class="history-link"><a th:href="@{/history}">📚 View Past Summaries</a></div>
+        <button class="dark-toggle" onclick="toggleDark()">🌙 Dark Mode</button>
+    </div>
+
+    <header>
+        <h1>📝 Smart Notes Summarizer</h1>
+        <p>Paste your notes below and get an instant summary.</p>
+    </header>
+
+    <form th:action="@{/summarize}" method="post" id="summaryForm">
+        <textarea name="notes" id="notesInput" placeholder="Paste your notes here..." th:text="${notes}" oninput="updateCharCount()"></textarea>
+        <div class="char-count"><span id="charCount">0</span> characters</div>
+
+        <div class="length-options">
+            <input type="radio" name="length" id="short" value="short" th:checked="${selectedLength == 'short'}">
+            <label for="short">Short</label>
+
+            <input type="radio" name="length" id="medium" value="medium" th:checked="${selectedLength == null or selectedLength == 'medium'}">
+            <label for="medium">Medium</label>
+
+            <input type="radio" name="length" id="long" value="long" th:checked="${selectedLength == 'long'}">
+            <label for="long">Long</label>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Summarize Notes</button>
+    </form>
+
+    <div class="summary-box" th:if="${summary}">
+        <h3>Summary</h3>
+        <p th:text="${summary}" id="summaryText"></p>
+        <div class="action-buttons">
+            <button type="button" onclick="copySummary()">📋 Copy</button>
+            <button type="button" onclick="downloadSummary()">⬇️ Download</button>
+        </div>
+    </div>
+
+    <footer>Built with Spring Boot</footer>
+    <div class="toast" id="toast"></div>
+</div>
+
+<script>
+    function updateCharCount() {
+        document.getElementById('charCount').textContent = document.getElementById('notesInput').value.length;
+    }
+    updateCharCount();
+
+    document.getElementById('summaryForm').addEventListener('submit', function() {
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.textContent = 'Summarizing...';
+    });
+
+    function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.remove('show');
+    void toast.offsetWidth; // force reflow so animation restarts
+    toast.classList.add('show');
+    setTimeout(() => { toast.classList.remove('show'); }, 2000);
+}
+
+function copySummary() {
+    const text = document.getElementById('summaryText').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('✅ Copied to clipboard!');
+    });
+}
+
+function downloadSummary() {
+    const text = document.getElementById('summaryText').innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'summary.txt';
+    link.click();
+    showToast('⬇️ Summary downloaded!');
+}
+    function toggleDark() {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    }
+
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark');
+    }
+</script>
+</body>
+</html>
